@@ -15,4 +15,10 @@ typedef struct _weather_info{
     uint32_t last_update_time;  // 本地更新时间(本地确保最少5分钟间隔) 
 }weather_info, *pweather_info;
 
+typedef struct _weather_img_list
+{
+    const char* name;    // 天气名 
+    const uint16_t* pic;  // 图片 
+}weather_img_list, *pweather_img_list;
+
 #endif  // _COMMON_DEFINE_HEADER_

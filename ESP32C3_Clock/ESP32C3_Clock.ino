@@ -22,6 +22,13 @@
 #include "./img/humidity.h"
 // 温度 
 #include "./img/temperature.h"
+// 天气
+#include "./img/weather/sunny.h"      // 晴朗 
+#include "./img/weather/overcast.h"   // 阴天 
+#include "./img/weather/rain.h"      // 雨天 
+#include "./img/weather/snow.h"      // 下雪 
+#include "./img/weather/thunder.h"   // 打雷 
+#include "./img/weather/cloudy.h"    // 多云 
 
 #include "common_def.h"
 
@@ -36,6 +43,16 @@ const uint16_t* Taikonaut[] = {
     gImage_i0, gImage_i1, gImage_i2, gImage_i3, gImage_i4, 
     gImage_i5, gImage_i6, gImage_i7, gImage_i8, gImage_i9
 };
+
+weather_img_list weather_img_data[] = {
+    {"晴", gImage_sunny},
+    {"阴", gImage_overcast},
+    {"雨", gImage_rain},
+    {"雪", gImage_snow},
+    {"雷", gImage_thunder},
+    {"云", gImage_cloudy},
+};
+
 
 // 统计UTF-8字符数 
 int GetUtf8LetterNumber(const char *s, size_t len)
@@ -109,6 +126,18 @@ void ShowWeather()
         aqi_left = left_space+aqi_r/2-2;
         break;
     }
+
+    // 天气图片 
+    const uint16_t* PWeatherPic = gImage_sunny;
+    for (int i = 0; i < sizeof(weather_img_data)/sizeof(weather_img_data[0]); i++)
+    {
+        if (strstr(WeatherData.weather.c_str(), weather_img_data[i].name) != NULL)
+        {
+            PWeatherPic = weather_img_data[i].pic;
+            break;
+        }
+    }
+    int weather_len = GetUtf8LetterNumber(WeatherData.weather.c_str(), WeatherData.weather.length());
     
     sprintf(gFormat_Str, "%s°C", WeatherData.temperature);
     // 整个过程加载字体 
@@ -118,6 +147,7 @@ void ShowWeather()
     tft.drawString(parea, 4, 5);
     // 天气(不定长) 
     tft.drawString(WeatherData.weather, 5, 34);
+    tft.pushImage(MSYHL25*weather_len+10, 30, 24, 24, PWeatherPic);
     // 温度 
     tft.pushImage(SUPERIOR_LEFT+LINE_WIDTH, 16, 24, 24, gImage_temp); 
     tft.drawString(gFormat_Str, SUPERIOR_LEFT+LINE_WIDTH+25, 20);
