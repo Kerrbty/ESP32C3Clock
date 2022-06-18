@@ -15,11 +15,32 @@ DynamicJsonDocument doc(1024);
 uint32_t background_color;
 uint32_t line_color;
 
+// 统计UTF-8字符数 
+int GetUtf8LetterNumber(const char *s, size_t len)
+{
+    if (s == NULL || len == 0)
+    {
+        return 0;
+    }
+    
+    int nCount = 0;
+    for (size_t i=0; i<len; i++)
+    {
+    	//if ((s[i] & 0b11000000) != 0b10000000) j++;
+        if ((s[i] & 0xc0) != 0x80) 
+        {
+            nCount++;
+        }
+    }
+    return nCount;
+}
+
 void UpdateWeather()
 {
     http.begin(WEATHER_URL);
     int httpCode = http.GET();
-    if(httpCode == HTTP_CODE_OK) {
+    if(httpCode == HTTP_CODE_OK) 
+    {
         // 获取json数据 
         String pageData = http.getString();
         DeserializationError error = deserializeJson(doc, pageData);
@@ -43,9 +64,10 @@ void UpdateWeather()
             const char* pcity = strchr(parea, '省');
 
             // 计算空气质量显示数据 
-            int r = 13;
+            int left_space = 3;
+            int aqi_r = 12;
             uint32_t color = TFT_GREEN;
-            int len = 40;
+            int len = 30;
             const char* chdisplay;
             uint32_t aqi = atoi(WeatherData.aqi.c_str());
             if (aqi < 50) {
@@ -73,16 +95,21 @@ void UpdateWeather()
             {
                 tft.drawString(parea, 5, 10);
             }
+            // 天气(不定长) 
             tft.drawString(WeatherData.weather, 5, 40);
+            // 星期(3个字符) 
             tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+15);
-            tft.drawString(WeatherData.wind, TFT_WIDTH-80, SUPERIOR+LINE_WIDTH+MIDIUM-50);
-            tft.drawString(WeatherData.humidity, TFT_WIDTH-55, SUPERIOR+LINE_WIDTH+MIDIUM-26);
-            // 显示空气质量 
-            tft.fillCircle(r+3, SUPERIOR+LINE_WIDTH+MIDIUM-r*2-2, r, color);
-            tft.fillRect(r+3, SUPERIOR+LINE_WIDTH+MIDIUM-r*3-2, len, r*2, color);
-            tft.fillCircle(r+len, SUPERIOR+LINE_WIDTH+MIDIUM-r*2-2, r, color);
+            // 风向(不定长) 
+            int nWindLen = GetUtf8LetterNumber(WeatherData.wind.c_str(), WeatherData.wind.length());
+            tft.drawString(WeatherData.wind, TFT_WIDTH-(MSYHL25*nWindLen+5), SUPERIOR+LINE_WIDTH+MIDIUM-50);
+            // 湿度(3个字符) 
+            tft.drawString(WeatherData.humidity, TFT_WIDTH-(MSYHL25*2+5), SUPERIOR+LINE_WIDTH+MIDIUM-26);
+            // 显示空气质量(1个字符) 
+            tft.fillCircle(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
+            tft.fillRect(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-2, len, aqi_r*2, color);
+            tft.fillCircle(aqi_r+len, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
             tft.setTextColor(TFT_BLACK, color, true);
-            tft.drawString(chdisplay, r+9, SUPERIOR+LINE_WIDTH+MIDIUM-r*3+1);
+            tft.drawString(chdisplay, left_space+(len+aqi_r*2-MSYHL25)/2, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3+1);
             // 卸载字体 
             tft.unloadFont();
 

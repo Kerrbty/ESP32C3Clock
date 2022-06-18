@@ -30,4 +30,8 @@
 #define  INFERIOR_RIGHT 115   // 下面高度 
 #define  LINE_WIDTH     3    // 线宽度 
 
+// 等宽字体 
+#define  MSYHL25        25 
+#define  NI7SEG45       45 
+
 #endif // _USER_CONDIG_ 
