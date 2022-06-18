@@ -34,4 +34,8 @@
 #define  MSYHL25        25 
 #define  NI7SEG45       45 
 
+// 板载小灯 
+#define  LED1           12  
+#define  LED2           13
+
 #endif // _USER_CONDIG_ 

@@ -53,6 +53,15 @@ weather_img_list weather_img_data[] = {
     {"云", gImage_cloudy},
 };
 
+void Led_On()
+{
+   digitalWrite(LED1, HIGH);
+}
+
+void Led_Off()
+{
+   digitalWrite(LED1, LOW);
+}
 
 // 统计UTF-8字符数 
 int GetUtf8LetterNumber(const char *s, size_t len)
@@ -172,6 +181,7 @@ void ShowWeather()
 
 void UpdateWeather()
 {
+    Led_On();
     http.begin(WEATHER_URL);
     int httpCode = http.GET();
     if(httpCode == HTTP_CODE_OK) 
@@ -215,6 +225,7 @@ void UpdateWeather()
         Serial.println("GET Weather Error");
     }
     http.end();
+    Led_Off();
 }
 
 void ShowTime(bool force_update = false)
@@ -269,6 +280,7 @@ void create_partition()
 
 void ConnectWifi()
 {
+    Led_On();
     WiFi.begin(WIFI_SSID, WIFI_PASSWD);
 
     tft.fillScreen(TFT_BLACK);
@@ -293,6 +305,7 @@ void ConnectWifi()
         tft.fillRect(x1+r, y1, width, height, TFT_GREEN);
         tft.fillCircle(width+r, y1+r, r, TFT_GREEN);
     }
+    Led_Off();
     Serial.print("\nWiFi connected, IP address:");
     Serial.println(WiFi.localIP());
     delay(500);
@@ -316,6 +329,7 @@ void SyncSystemTime()
     tft.drawString("正在同步时间...", 10, 60);
     tft.unloadFont();
     do {
+        Led_On();
         configTime(gmtOffset_sec, daylightOffset_sec, NTP_HOST);
         tft.fillRect(x1, y1, 240, height+2, TFT_BLACK);  // 进度条重新刷黑 
         for (int i = 0; i < 31; i++)
@@ -325,6 +339,7 @@ void SyncSystemTime()
             tft.fillCircle(width+r, y1+r, r, TFT_GREEN);
             delay(150);
         }
+        Led_Off();
         delay(500);
         ltime = time(NULL);
     } while (ltime<24*60*60);
@@ -374,6 +389,9 @@ void test()
 
 void setup() {
     Serial.begin(115200);
+    pinMode(LED1, OUTPUT);
+    pinMode(LED2, OUTPUT);
+    digitalWrite(LED2, LOW);
 
     // 初始化tft屏幕240*240 
     tft.init();
