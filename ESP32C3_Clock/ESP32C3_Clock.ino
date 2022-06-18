@@ -60,8 +60,24 @@ void UpdateWeather()
             WeatherData.update_time = obj["updatetime"].as<uint32_t>();
             WeatherData.last_update_time = time(NULL);
 
+            // 定位太长了，截断 
             const char* parea = WeatherData.area.c_str();
-            const char* pcity = strchr(parea, '省');
+            if (GetUtf8LetterNumber(parea, WeatherData.area.length()) > 6)
+            {
+                const char* pcity = strchr(parea, '省');
+                if (pcity)
+                {
+                    parea = pcity + 1;
+                    if (GetUtf8LetterNumber(parea, strlen(parea)) > 6)
+                    {
+                        const char* pcity = strchr(parea, '市');
+                        if (pcity)
+                        {
+                            parea = pcity + 1;
+                        } 
+                    }
+                }                
+            }
 
             // 计算空气质量显示数据 
             int left_space = 3;
@@ -85,18 +101,12 @@ void UpdateWeather()
             // 整个过程加载字体 
             tft.loadFont(msyhl25); 
             tft.setTextColor(TFT_BLACK, background_color, true);
-            tft.drawString(gFormat_Str, SUPERIOR_LEFT+LINE_WIDTH+10, 24);
-            tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+15);
-            if (pcity)
-            {
-                tft.drawString(pcity+1, 5, 10);
-            }
-            else
-            {
-                tft.drawString(parea, 5, 10);
-            }
+            // 定位 
+            tft.drawString(parea, 5, 10);
             // 天气(不定长) 
             tft.drawString(WeatherData.weather, 5, 40);
+            // 温度 
+            tft.drawString(gFormat_Str, SUPERIOR_LEFT+LINE_WIDTH+10, 24);
             // 星期(3个字符) 
             tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+15);
             // 风向(不定长) 
@@ -183,16 +193,11 @@ void create_partition()
     tft.fillRect(INFERIOR_LEFT, SUPERIOR+MIDIUM, LINE_WIDTH, INFERIOR, line_color);
 }
 
-void setup() {
-    Serial.begin(115200);
-
-    // 初始化tft屏幕240*240  
-    tft.init();
-    tft.fillScreen(TFT_BLACK);
-
-    // 连接wifi 
+void ConnectWifi()
+{
     WiFi.begin(WIFI_SSID, WIFI_PASSWD);
 
+    tft.fillScreen(TFT_BLACK);
     tft.loadFont(msyhl25);
     tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
     tft.drawString("正在连接网络...", 10, 60);
@@ -216,15 +221,52 @@ void setup() {
     }
     Serial.print("\nWiFi connected, IP address:");
     Serial.println(WiFi.localIP());
+    delay(500);
+}
 
-    // 服务器获取根据IP获取本地地理位置及时区 
-    delay(800);
+void SyncSystemTime()
+{
     long gmtOffset_sec = TIME_ZONE*60*60;
     int daylightOffset_sec = 0;
+    int index = 0;
+    int x1 = 0;
+    int y1 = 100;
+    int height = 30;
+    int r = height/2;
+    uint32_t ltime;
 
-    // 配置本地时间 
-    configTime(gmtOffset_sec, daylightOffset_sec, NTP_HOST);
-    delay(4000);
+    // 显示进度条 
+    tft.fillScreen(TFT_BLACK);
+    tft.loadFont(msyhl25);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
+    tft.drawString("正在同步时间...", 10, 60);
+    tft.unloadFont();
+    do {
+        configTime(gmtOffset_sec, daylightOffset_sec, NTP_HOST);
+        tft.fillRect(x1, y1, 240, height+2, TFT_BLACK);  // 进度条重新刷黑 
+        for (int i = 0; i < 31; i++)
+        {
+            int width = 7*i;
+            tft.fillRect(x1+r, y1, width, height, TFT_GREEN);
+            tft.fillCircle(width+r, y1+r, r, TFT_GREEN);
+            delay(150);
+        }
+        delay(500);
+        ltime = time(NULL);
+    } while (ltime<24*60*60);
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    // 初始化tft屏幕240*240 
+    tft.init();
+
+    // 连接wifi 
+    ConnectWifi();
+
+    // 同步时间 
+    SyncSystemTime();
 
     // 屏幕分区 
     create_partition();
@@ -246,10 +288,11 @@ void loop() {
     {
         if ( ltime > (WeatherData.last_update_time+NETWOEK_WEATHER_MIN*60) )
         {
-            UpdateWeather();
             // 重新显示天气信息 
+            UpdateWeather();  
         }
     }
 
+    // 更新时间 
     ShowTime();
 }
