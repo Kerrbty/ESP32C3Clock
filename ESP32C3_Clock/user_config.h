@@ -21,11 +21,11 @@
 // 屏幕区域 
 #define  TFT_WIDTH      240 
 #define  TFT_HEIGHT     240 
-#define  SUPERIOR       65   // 上边高度 
-#define  SUPERIOR_LEFT  165  // 上面左边区域宽度 
+#define  SUPERIOR       60   // 上边高度 
+#define  SUPERIOR_LEFT  155  // 上面左边区域宽度 
 #define  SUPERIOR_RIGHT 72   // 上面右边区域宽度 
-#define  MIDIUM         120  // 中间高度 
-#define  INFERIOR       60   // 下面高度 
+#define  MIDIUM         135  // 中间高度 
+#define  INFERIOR       45   // 下面高度 
 #define  INFERIOR_LEFT  125  // 下面高度 
 #define  INFERIOR_RIGHT 115   // 下面高度 
 #define  LINE_WIDTH     3    // 线宽度 

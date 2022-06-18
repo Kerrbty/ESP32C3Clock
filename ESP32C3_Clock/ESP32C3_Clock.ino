@@ -1,10 +1,28 @@
-#include "Ni7seg45.h"
-#include "msyhl25.h"
+#include "./font/Ni7seg45.h"
+#include "./font/msyhl25.h"
 #include <time.h>
 #include <WiFi.h>
-#include <TFT_eSPI.h>
 #include <HTTPClient.h>
+// tft 驱动库 
+#include <TFT_eSPI.h>
+// json解析库 
 #include <ArduinoJson.h>
+// 太空人图片  
+#include "./img/taikonaut/i0.h" 
+#include "./img/taikonaut/i1.h" 
+#include "./img/taikonaut/i2.h" 
+#include "./img/taikonaut/i3.h" 
+#include "./img/taikonaut/i4.h" 
+#include "./img/taikonaut/i5.h" 
+#include "./img/taikonaut/i6.h" 
+#include "./img/taikonaut/i7.h" 
+#include "./img/taikonaut/i8.h" 
+#include "./img/taikonaut/i9.h" 
+// 湿度
+#include "./img/humidity.h"
+// 温度 
+#include "./img/temperature.h"
+
 #include "common_def.h"
 
 HTTPClient http;
@@ -14,6 +32,10 @@ char gFormat_Str[64] = {0};
 DynamicJsonDocument doc(1024);
 uint32_t background_color;
 uint32_t line_color;
+const uint16_t* Taikonaut[] = { 
+    gImage_i0, gImage_i1, gImage_i2, gImage_i3, gImage_i4, 
+    gImage_i5, gImage_i6, gImage_i7, gImage_i8, gImage_i9
+};
 
 // 统计UTF-8字符数 
 int GetUtf8LetterNumber(const char *s, size_t len)
@@ -33,6 +55,89 @@ int GetUtf8LetterNumber(const char *s, size_t len)
         }
     }
     return nCount;
+}
+
+void ShowWeather()
+{
+    // 定位太长了，截断 
+    const char* parea = WeatherData.area.c_str();
+    if (GetUtf8LetterNumber(parea, WeatherData.area.length()) > 6)
+    {
+        const char* pcity = strchr(parea, '省');
+        if (pcity)
+        {
+            parea = pcity + 1;
+            if (GetUtf8LetterNumber(parea, strlen(parea)) > 6)
+            {
+                const char* pcity = strchr(parea, '市');
+                if (pcity)
+                {
+                    parea = pcity + 1;
+                } 
+            }
+        }                
+    }
+
+    // 计算空气质量显示数据 
+    int left_space = 3;
+    int aqi_r = 12;
+    uint32_t color = TFT_GREEN;
+    int len = 30;
+    const char* chdisplay;
+    uint32_t aqi = atoi(WeatherData.aqi.c_str());
+    if (aqi < 50) {
+        color = TFT_GREEN;
+        chdisplay = "优";
+    } else if (aqi<99) {
+        color = TFT_YELLOW;
+        chdisplay = "良";
+    } else {
+        color = TFT_RED;
+        chdisplay = "差";
+    }
+    // 空气质量左边距 
+    int aqi_left = 0;
+    switch (WeatherData.aqi.length())
+    {
+    case 1:
+        aqi_left = left_space+aqi_r+(aqi_r/2)-2;
+        break;
+    case 2:
+        aqi_left = left_space+aqi_r-2;
+        break;
+    default:
+        aqi_left = left_space+aqi_r/2-2;
+        break;
+    }
+    
+    sprintf(gFormat_Str, "%s°C", WeatherData.temperature);
+    // 整个过程加载字体 
+    tft.loadFont(msyhl25); 
+    tft.setTextColor(TFT_BLACK, background_color, true);
+    // 定位 
+    tft.drawString(parea, 4, 5);
+    // 天气(不定长) 
+    tft.drawString(WeatherData.weather, 5, 34);
+    // 温度 
+    tft.pushImage(SUPERIOR_LEFT+LINE_WIDTH, 16, 24, 24, gImage_temp); 
+    tft.drawString(gFormat_Str, SUPERIOR_LEFT+LINE_WIDTH+25, 20);
+    // 星期(3个字符) 
+    tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+10);
+    // 风向(不定长) 
+    int nWindLen = GetUtf8LetterNumber(WeatherData.wind.c_str(), WeatherData.wind.length());
+    tft.drawString(WeatherData.wind, TFT_WIDTH-(MSYHL25*nWindLen+5), SUPERIOR+LINE_WIDTH+MIDIUM-49);
+    // 湿度(3个字符) 
+    tft.pushImage(TFT_WIDTH-(MSYHL25*2+33), SUPERIOR+LINE_WIDTH+MIDIUM-29, 24, 24, gImage_SD); 
+    tft.drawString(WeatherData.humidity, TFT_WIDTH-(MSYHL25*2+5), SUPERIOR+LINE_WIDTH+MIDIUM-26);
+    // 显示空气质量(1个字符) 
+    tft.drawString(WeatherData.aqi, aqi_left, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-MSYHL25+2);
+    tft.fillCircle(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
+    tft.fillRect(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-2, len, aqi_r*2, color);
+    tft.fillCircle(aqi_r+len, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
+    tft.setTextColor(TFT_BLACK, color, true);
+    tft.drawString(chdisplay, left_space+(len+aqi_r*2-MSYHL25)/2, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3+1);
+    // 卸载字体 
+    tft.unloadFont();
 }
 
 void UpdateWeather()
@@ -60,68 +165,7 @@ void UpdateWeather()
             WeatherData.update_time = obj["updatetime"].as<uint32_t>();
             WeatherData.last_update_time = time(NULL);
 
-            // 定位太长了，截断 
-            const char* parea = WeatherData.area.c_str();
-            if (GetUtf8LetterNumber(parea, WeatherData.area.length()) > 6)
-            {
-                const char* pcity = strchr(parea, '省');
-                if (pcity)
-                {
-                    parea = pcity + 1;
-                    if (GetUtf8LetterNumber(parea, strlen(parea)) > 6)
-                    {
-                        const char* pcity = strchr(parea, '市');
-                        if (pcity)
-                        {
-                            parea = pcity + 1;
-                        } 
-                    }
-                }                
-            }
-
-            // 计算空气质量显示数据 
-            int left_space = 3;
-            int aqi_r = 12;
-            uint32_t color = TFT_GREEN;
-            int len = 30;
-            const char* chdisplay;
-            uint32_t aqi = atoi(WeatherData.aqi.c_str());
-            if (aqi < 50) {
-                color = TFT_GREEN;
-                chdisplay = "优";
-            } else if (aqi<99) {
-                color = TFT_YELLOW;
-                chdisplay = "良";
-            } else {
-                color = TFT_RED;
-                chdisplay = "差";
-            }
-            
-            sprintf(gFormat_Str, "%s°C", WeatherData.temperature);
-            // 整个过程加载字体 
-            tft.loadFont(msyhl25); 
-            tft.setTextColor(TFT_BLACK, background_color, true);
-            // 定位 
-            tft.drawString(parea, 5, 10);
-            // 天气(不定长) 
-            tft.drawString(WeatherData.weather, 5, 40);
-            // 温度 
-            tft.drawString(gFormat_Str, SUPERIOR_LEFT+LINE_WIDTH+10, 24);
-            // 星期(3个字符) 
-            tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+15);
-            // 风向(不定长) 
-            int nWindLen = GetUtf8LetterNumber(WeatherData.wind.c_str(), WeatherData.wind.length());
-            tft.drawString(WeatherData.wind, TFT_WIDTH-(MSYHL25*nWindLen+5), SUPERIOR+LINE_WIDTH+MIDIUM-50);
-            // 湿度(3个字符) 
-            tft.drawString(WeatherData.humidity, TFT_WIDTH-(MSYHL25*2+5), SUPERIOR+LINE_WIDTH+MIDIUM-26);
-            // 显示空气质量(1个字符) 
-            tft.fillCircle(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
-            tft.fillRect(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-2, len, aqi_r*2, color);
-            tft.fillCircle(aqi_r+len, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
-            tft.setTextColor(TFT_BLACK, color, true);
-            tft.drawString(chdisplay, left_space+(len+aqi_r*2-MSYHL25)/2, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3+1);
-            // 卸载字体 
-            tft.unloadFont();
+            ShowWeather();
 
             // 调试日志 
             Serial.print("城市: ");
@@ -156,7 +200,7 @@ void ShowTime(bool force_update = false)
             gmt->tm_mon+1, gmt->tm_mday);
         tft.loadFont(msyhl25);
         tft.setTextColor(TFT_BLACK, background_color, true);
-        tft.drawString(gFormat_Str, 8, SUPERIOR+MIDIUM+LINE_WIDTH*2+15);
+        tft.drawString(gFormat_Str, 8, SUPERIOR+MIDIUM+LINE_WIDTH*2+10);
         tft.unloadFont();
     }
 
@@ -166,7 +210,7 @@ void ShowTime(bool force_update = false)
         sprintf(gFormat_Str, "%02u:%02u", gmt->tm_hour, gmt->tm_min);
         tft.loadFont(Ni7seg45);
         tft.setTextColor(TFT_BLACK, background_color, true);
-        tft.drawString(gFormat_Str, 5, SUPERIOR+LINE_WIDTH+12);
+        tft.drawString(gFormat_Str, 9, SUPERIOR+LINE_WIDTH+12);
         tft.unloadFont();
     }
 
@@ -174,13 +218,13 @@ void ShowTime(bool force_update = false)
     sprintf(gFormat_Str, "%02u", gmt->tm_sec);
     tft.loadFont(msyhl25);
     tft.setTextColor(TFT_BLACK, background_color, true);
-    tft.drawString(gFormat_Str, SUPERIOR+85, SUPERIOR+LINE_WIDTH+31);
+    tft.drawString(gFormat_Str, NI7SEG45*3+20, SUPERIOR+LINE_WIDTH+NI7SEG45-15);
     tft.unloadFont();
 }
 
 void create_partition()
 {
-    background_color = tft.color565(195, 230, 245);
+    background_color = TFT_WHITE; // tft.color565(195, 230, 245);
     line_color = tft.color565(180, 180, 180);
 
     tft.fillScreen(background_color);
@@ -256,11 +300,55 @@ void SyncSystemTime()
     } while (ltime<24*60*60);
 }
 
+void ShowTaikonaut()
+{
+    static uint8_t index = 0;
+    tft.pushImage(65, SUPERIOR+MIDIUM+LINE_WIDTH-75, 70, 70, Taikonaut[index]); 
+    index++;
+    if (index >= sizeof(Taikonaut)/sizeof(Taikonaut[0]))
+    {
+        index = 0;
+    }
+}
+
+void test()
+{
+    // 屏幕分区 
+    create_partition();
+
+    WeatherData.temperature = "33";
+    WeatherData.weather = "多云";
+    WeatherData.wind = "东南风";
+    WeatherData.windPower = "2级",
+    WeatherData.humidity = "51%";
+    WeatherData.aqi = "80";
+    WeatherData.area = "浙江省杭州市";
+    WeatherData.week = "星期六";
+    WeatherData.update_time = time(NULL);
+    WeatherData.last_update_time = time(NULL);
+    ShowWeather();
+
+    // 显示时间 
+    ShowTime(true);
+    while(true)
+    {
+        ShowTaikonaut();
+        delay(150); 
+    }
+
+    while(true)
+    {
+        delay(1000);
+    }
+}
+
 void setup() {
     Serial.begin(115200);
 
     // 初始化tft屏幕240*240 
     tft.init();
+
+//    test();
 
     // 连接wifi 
     ConnectWifi();
@@ -280,7 +368,8 @@ void setup() {
 
 void loop() {
     // put your main code here, to run repeatedly:
-    delay(1000);
+    delay(150);
+    ShowTaikonaut();
 
     // 查看是否需要更新天气 
     uint32_t ltime = time(NULL);
@@ -292,7 +381,11 @@ void loop() {
             UpdateWeather();  
         }
     }
+    delay(150);
+    ShowTaikonaut();
 
     // 更新时间 
     ShowTime();
+    delay(150);
+    ShowTaikonaut();
 }
