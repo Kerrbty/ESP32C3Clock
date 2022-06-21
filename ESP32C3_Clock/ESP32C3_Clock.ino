@@ -214,6 +214,13 @@ void UpdateWeather()
             Serial.println(WeatherData.weather);
             Serial.print("气温: ");
             Serial.println(WeatherData.temperature);
+            Serial.print("更新时间: ");
+
+            time_t ltime = WeatherData.update_time;
+            struct tm *gmt = localtime( &ltime );
+            Serial.printf("%04u-%02u-%02u %02u:%02u\n", 
+                gmt->tm_year+1900, gmt->tm_mon+1, gmt->tm_mday,
+                gmt->tm_hour, gmt->tm_min);
         }
         else
         {
@@ -416,24 +423,24 @@ void setup() {
 
 void loop() {
     // put your main code here, to run repeatedly:
-    delay(150);
+    delay(100);
     ShowTaikonaut();
 
-    // 查看是否需要更新天气 
+    // 30分钟更新一次，如果网络上30分钟后还没更新过的，5分钟查询一次 
     uint32_t ltime = time(NULL);
     if ( ltime > (WeatherData.last_update_time+LOCAL_HTTP_MIN*60) )
     {
-        if ( ltime > (WeatherData.last_update_time+NETWOEK_WEATHER_MIN*60) )
+        if ( ltime > (WeatherData.update_time+NETWOEK_WEATHER_MIN*60) )
         {
             // 重新显示天气信息 
             UpdateWeather();  
         }
     }
-    delay(150);
+    delay(100);
     ShowTaikonaut();
 
     // 更新时间 
     ShowTime();
-    delay(150);
+    delay(100);
     ShowTaikonaut();
 }
