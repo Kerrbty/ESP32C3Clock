@@ -153,9 +153,10 @@ void ShowWeather()
     tft.loadFont(msyhl25); 
     tft.setTextColor(TFT_BLACK, background_color, true);
     // 定位 
+    tft.fillRect(4, 5, MSYHL25*6, MSYHL25*2+4, background_color);
     tft.drawString(parea, 4, 5);
     // 天气(不定长) 
-    tft.drawString(WeatherData.weather, 5, 34);
+    tft.drawString(WeatherData.weather, 5, 5+MSYHL25+4);
     tft.pushImage(MSYHL25*weather_len+10, 30, 24, 24, PWeatherPic);
     // 温度 
     tft.pushImage(SUPERIOR_LEFT+LINE_WIDTH, 16, 24, 24, gImage_temp); 
@@ -163,6 +164,7 @@ void ShowWeather()
     // 星期(3个字符) 
     tft.drawString(WeatherData.week, 143, SUPERIOR+MIDIUM+LINE_WIDTH*2+10);
     // 风向(不定长) 
+    tft.fillRect(TFT_WIDTH-(MSYHL25*3+5), SUPERIOR+LINE_WIDTH+MIDIUM-49, MSYHL25*3, MSYHL25, background_color);
     int nWindLen = GetUtf8LetterNumber(WeatherData.wind.c_str(), WeatherData.wind.length());
     tft.drawString(WeatherData.wind, TFT_WIDTH-(MSYHL25*nWindLen+5), SUPERIOR+LINE_WIDTH+MIDIUM-49);
     // 湿度(3个字符) 
