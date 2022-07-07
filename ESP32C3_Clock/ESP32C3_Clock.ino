@@ -2,11 +2,19 @@
 #include "./font/msyhl25.h"
 #include <time.h>
 #include <WiFi.h>
+#include <WiFiAP.h>
+#include <WiFiScan.h>
+#include <WebServer.h>
+#include <DNSServer.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
+#include <EEPROM.h>
 // tft 驱动库 
 #include <TFT_eSPI.h>
 // json解析库 
 #include <ArduinoJson.h>
+// wifi配置二维码
+#include "./img/WifiQrcode.h"
 // 太空人图片  
 #include "./img/taikonaut/i0.h" 
 #include "./img/taikonaut/i1.h" 
@@ -31,6 +39,11 @@
 #include "./img/weather/cloudy.h"    // 多云 
 
 #include "common_def.h"
+
+WebServer ConfigWifiServer;
+String WifiSSID;
+String WifiPassword;
+bool bSetWifiSuccess;
 
 HTTPClient http;
 TFT_eSPI tft = TFT_eSPI();
@@ -81,6 +94,198 @@ int GetUtf8LetterNumber(const char *s, size_t len)
         }
     }
     return nCount;
+}
+
+// 扫描到的wifi列表，放在html的option中 
+String GetWifiOptionList()
+{
+    static String wifilist;
+    static time_t last_time = 0;
+    time_t current = time(NULL);
+    if (last_time+3 < current)
+    {
+        wifilist = "";
+        WiFiScanClass scanwifi;
+        scanwifi.scanNetworks();
+        while(true)
+        {
+            if (scanwifi.scanComplete() != WIFI_SCAN_RUNNING)
+            {
+                break;
+            }
+            delay(100);
+        }
+
+        int16_t nCount = scanwifi.scanComplete();
+        if (nCount != WIFI_SCAN_FAILED)
+        {
+            for (int i=0; i<nCount; i++)
+            {
+                String ssid;
+                uint8_t encType;
+                int32_t rssi;
+                uint8_t* bssid;
+                int32_t channel;
+                if (scanwifi.getNetworkInfo(i, ssid, encType, rssi, bssid, channel))
+                {
+                    wifilist = wifilist + "<option value='" + ssid + "'>" + ssid + "</option>";
+                    Serial.println("SSID: " + ssid);
+                }
+            }
+        }
+        scanwifi.scanDelete();
+        last_time = time(NULL);
+    }
+    return wifilist;
+}
+
+// 设置wifi页面 
+void WifiConnectPage() 
+{
+    String arg = ConfigWifiServer.uri();
+    ConfigWifiServer.send(200, "text/html", FrontHtml+GetWifiOptionList()+AfterHtml);
+}
+
+// 获取wifi配置 
+void HomeConnectPage()
+{
+    if (ConfigWifiServer.args() == 3)
+    {
+        WifiSSID = ConfigWifiServer.arg(0);
+        if (WifiSSID == "Other")
+        {
+            WifiSSID = ConfigWifiServer.arg(1);
+        }
+        WifiPassword = ConfigWifiServer.arg(2);
+        bSetWifiSuccess = true;
+
+        ConfigWifiServer.send(200, "text/plain", "config wait...");
+    }
+    else
+    {
+        WifiConnectPage();
+    }
+}
+
+void ConfigWifi()
+{
+    const char *ssid = "ESP32C3";
+    const char *password = "";
+    IPAddress myIP;
+
+    // 显示配置二维码 
+    tft.pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, gWifiConfig_Qrcode); 
+    // 设置热点 
+    WiFi.softAP(ssid, password);
+    myIP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(myIP);
+
+    // 所有dns查询都被重定向到ap热点ip 
+    DNSServer dnsserver;
+    dnsserver.start(53, "*", myIP);
+
+    // 拦截http请求 
+    ConfigWifiServer.on("/", HTTP_POST, HomeConnectPage);
+    ConfigWifiServer.onNotFound(WifiConnectPage);
+    ConfigWifiServer.begin(80);
+    bSetWifiSuccess = false;
+    while(!bSetWifiSuccess)
+    {
+        // 边解析dns，边http请求处理 
+        dnsserver.processNextRequest(); 
+        ConfigWifiServer.handleClient();
+        delay(50);
+    }
+}
+
+// nvs/SPIClass/Preferences 
+bool ReadWifiConfig()
+{
+    Preferences prefs;
+    if ( !prefs.begin("wifispace", false, "nvs") )
+    {
+        Serial.println("read open preferences error");
+    }
+    WifiSSID = prefs.getString("ssid", "");
+    WifiPassword = prefs.getString("password", "");
+    prefs.end();
+    
+    /*
+    EEPROM.begin(1024);
+    WifiSSID.clear();
+    WifiPassword.clear();
+    if (EEPROM.read(0) == 0x5A)
+    {
+        for (int i = 1; i < WIFI_STR_LEN+1; i++)
+        {
+            char ch = EEPROM.read(i);
+            if (ch == 0)
+            {
+                break;
+            }
+            WifiSSID += ch;
+        }
+        for (int i = WIFI_STR_LEN+1; i < WIFI_STR_LEN*2+1; i++)
+        {
+            char ch = EEPROM.read(i);
+            if (ch == 0)
+            {
+                break;
+            }
+            WifiPassword += ch;
+        }
+    }
+    EEPROM.commit();
+    */
+
+    Serial.printf("read ssid: %s, password: %s\n", WifiSSID.c_str(), WifiPassword.c_str());
+
+    if (WifiSSID.length()>0)
+    {
+        return true;
+    }
+    return false;    
+}
+
+void SaveWifiConfig()
+{
+    Preferences prefs;
+    if ( !prefs.begin("wifispace", false, "nvs") )
+    {
+        Serial.println("write open preferences error");
+    }
+    prefs.putString("ssid", WifiSSID);
+    prefs.putString("password", WifiPassword);
+    prefs.end();
+    
+   /*
+   EEPROM.begin(1024);
+   EEPROM.write(0, 0x5A);
+   for (int i = 1; i < WIFI_STR_LEN+1; i++)
+    {
+        if (i>=WifiSSID.length())
+        {
+            EEPROM.write(i, 0);
+        }
+        else
+        {
+            EEPROM.write(i, (uint8_t)WifiSSID[i]);
+        }
+    }
+    for (int i = WIFI_STR_LEN+1; i < WIFI_STR_LEN*2+1; i++)
+    {
+        if (i-WIFI_STR_LEN >= WifiSSID.length())
+        {
+            EEPROM.write(i, 0);
+        }
+        else
+        {
+            EEPROM.write(i, (uint8_t)WifiPassword[i-WIFI_STR_LEN]);
+        }
+    }
+    EEPROM.commit();
+    */
 }
 
 void ShowWeather()
@@ -171,6 +376,7 @@ void ShowWeather()
     tft.pushImage(TFT_WIDTH-(MSYHL25*2+33), SUPERIOR+LINE_WIDTH+MIDIUM-29, 24, 24, gImage_SD); 
     tft.drawString(WeatherData.humidity, TFT_WIDTH-(MSYHL25*2+5), SUPERIOR+LINE_WIDTH+MIDIUM-26);
     // 显示空气质量(1个字符) 
+    tft.fillRect(left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-MSYHL25+2, MSYHL25*3, MSYHL25, background_color); // 3位变2位的时候，清背景 
     tft.drawString(WeatherData.aqi, aqi_left, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-MSYHL25+2);
     tft.fillCircle(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*2-2, aqi_r, color);
     tft.fillRect(aqi_r+left_space, SUPERIOR+LINE_WIDTH+MIDIUM-aqi_r*3-2, len, aqi_r*2, color);
@@ -287,10 +493,16 @@ void create_partition()
     tft.fillRect(INFERIOR_LEFT, SUPERIOR+MIDIUM, LINE_WIDTH, INFERIOR, line_color);
 }
 
-void ConnectWifi()
+bool ConnectWifi()
 {
+    bool conn_result = false;
+    if (WifiSSID.length() == 0)
+    {
+        return conn_result;
+    }
+    
     Led_On();
-    WiFi.begin(WIFI_SSID, WIFI_PASSWD);
+    WiFi.begin(WifiSSID.c_str(), WifiPassword.c_str());
 
     tft.fillScreen(TFT_BLACK);
     tft.loadFont(msyhl25);
@@ -305,7 +517,7 @@ void ConnectWifi()
     int height = 30;
     int r = height/2;
     tft.fillCircle(x1+r, y1+r, r, TFT_GREEN);
-    while (WiFi.status() != WL_CONNECTED) {
+    while (true) {
         index++;
         delay(100);
         Serial.print(".");
@@ -313,11 +525,30 @@ void ConnectWifi()
         int width = index*24/4;
         tft.fillRect(x1+r, y1, width, height, TFT_GREEN);
         tft.fillCircle(width+r, y1+r, r, TFT_GREEN);
+
+        // 查询连接结果 
+        int status = WiFi.status();
+        if (
+            status == WL_CONNECT_FAILED || 
+            status == WL_NO_SSID_AVAIL || 
+            status == WL_CONNECTION_LOST
+            )
+        {
+            conn_result = false;
+            break;
+        }
+        else if (status == WL_CONNECTED)
+        {
+            conn_result = true;
+            Led_Off();
+            Serial.print("\nWiFi connected, IP address:");
+            Serial.println(WiFi.localIP());
+            delay(500);
+            break;
+        }
+        Serial.println(status);
     }
-    Led_Off();
-    Serial.print("\nWiFi connected, IP address:");
-    Serial.println(WiFi.localIP());
-    delay(500);
+    return conn_result;
 }
 
 void SyncSystemTime()
@@ -407,8 +638,19 @@ void setup() {
 
 //    test();
 
+    // 读取之前的wifi配置 
+    if ( !ReadWifiConfig() )
+    {
+        ConfigWifi();
+    }
+
     // 连接wifi 
-    ConnectWifi();
+    while( !ConnectWifi() )
+    {
+        ConfigWifi();
+    }
+    // 连接成功，保存wifi配置 
+    SaveWifiConfig();
 
     // 同步时间 
     SyncSystemTime();
