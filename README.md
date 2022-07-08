@@ -4,12 +4,15 @@
 ## 展示
 
 二维码配置:
+
 ![配置网络二维码](./img/scan_qrcode_wifi.jpg)
 
 网络配置页:
+
 ![网络配置页面](./img/wifi_config_phone.png)
 
 主界面:
+
 ![主界面](./img/weather_clock_desktop.jpg)
 
 ## 模块
