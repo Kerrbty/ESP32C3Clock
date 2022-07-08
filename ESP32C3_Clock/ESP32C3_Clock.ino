@@ -387,8 +387,9 @@ void ShowWeather()
     tft.unloadFont();
 }
 
-void UpdateWeather()
+bool UpdateWeather()
 {
+    bool bUpdate = false;
     Led_On();
     http.begin(WEATHER_URL);
     int httpCode = http.GET();
@@ -414,6 +415,7 @@ void UpdateWeather()
             WeatherData.last_update_time = time(NULL);
 
             ShowWeather();
+            bUpdate = true;
 
             // 调试日志 
             Serial.print("城市: ");
@@ -441,6 +443,7 @@ void UpdateWeather()
     }
     http.end();
     Led_Off();
+    return bUpdate;
 }
 
 void ShowTime(bool force_update = false)
@@ -677,7 +680,38 @@ void loop() {
         if ( ltime > (WeatherData.update_time+NETWOEK_WEATHER_MIN*60) )
         {
             // 重新显示天气信息 
-            UpdateWeather();  
+            if ( !UpdateWeather() )
+            {
+                // wifi 可能出问题了 
+                int status = WiFi.status();
+                if (status == WL_NO_SSID_AVAIL || status == WL_CONNECTION_LOST)
+                {
+                    // 重连wifi
+                    bool bNewWifiConfig = false;
+                    while( !ConnectWifi() )
+                    {
+                        ConfigWifi();
+                        bNewWifiConfig = true;
+                    }
+
+                    // wifi 配置已改,需要重存储新网络信息,并重绘界面 
+                    if (bNewWifiConfig)
+                    {
+                        SaveWifiConfig();
+
+                        // 重绘  
+                        create_partition();
+                        UpdateWeather();
+                        ShowTime(true);
+                    }
+
+                    // 如果是原来的wifi重新连接，那么等一会儿再更新天气信息吧 
+                }
+                else if (status != WL_CONNECTED)
+                {
+                    Serial.printf("Wifi status: %u\n", status);
+                }
+            }
         }
     }
     delay(100);
