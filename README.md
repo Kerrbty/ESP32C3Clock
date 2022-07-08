@@ -53,7 +53,7 @@
 
 ### 配置修改
 
-1. TFT_eSPI 库定义(备份原始 User_Setup.h，新建一个复制以下代码进入即可)
+1. TFT_eSPI 库定义(备份原始 User_Setup.h，新建一个复制以下代码进入即可，默认安装位置：我的文档 -> Arduino -> libraries -> TFT_eSPI)
 
 ```C++
 #define USER_SETUP_INFO "User_Setup"
