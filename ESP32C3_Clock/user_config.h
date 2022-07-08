@@ -1,14 +1,14 @@
 #ifndef _USER_CONDIG_
 #define _USER_CONDIG_
 
-// wifi 账号密码 
-#define WIFI_SSID       "wxbdev"
-#define WIFI_PASSWD     "Tuibao123123"
+// wifi 账号密码最大长度  
 #define WIFI_STR_LEN    255
 
+// 热点名
+#define AP_SSID         "ESP32C3"
+#define AP_PASSWORD     ""
+
 // IP获取本地地理位置、时区 及 天气URL 
-#define HOST            "1.15.242.194"
-#define URL_PATH        "/getweather"
 #define WEATHER_URL     "http://1.15.242.194/getweather"
 
 // 时间同步服务器 
@@ -16,8 +16,8 @@
 
 // 时区 
 #define TIME_ZONE        8
-#define LOCAL_HTTP_MIN   3
-#define NETWOEK_WEATHER_MIN    30 
+#define LOCAL_HTTP_MIN   3     // 本地http间隔3分钟  
+#define NETWOEK_WEATHER_MIN    30   // 网络上天气间隔时间30分 
 
 // 屏幕区域 
 #define  TFT_WIDTH      240 

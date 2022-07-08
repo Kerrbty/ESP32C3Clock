@@ -169,14 +169,12 @@ void HomeConnectPage()
 
 void ConfigWifi()
 {
-    const char *ssid = "ESP32C3";
-    const char *password = "";
     IPAddress myIP;
 
     // 显示配置二维码 
     tft.pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, gWifiConfig_Qrcode); 
     // 设置热点 
-    WiFi.softAP(ssid, password);
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
     myIP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
     Serial.println(myIP);
