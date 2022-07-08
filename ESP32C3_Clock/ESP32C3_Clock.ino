@@ -171,6 +171,10 @@ void ConfigWifi()
 {
     IPAddress myIP;
 
+    WiFi.mode(WIFI_AP);
+    WiFi.disconnect();
+    WiFi.setTxPower(WIFI_POWER_5dBm);
+
     // 显示配置二维码 
     tft.pushImage(0, 0, TFT_WIDTH, TFT_HEIGHT, gWifiConfig_Qrcode); 
     // 设置热点 
@@ -195,6 +199,9 @@ void ConfigWifi()
         ConfigWifiServer.handleClient();
         delay(50);
     }
+    dnsserver.stop();
+    ConfigWifiServer.close();
+    WiFi.softAPdisconnect();
 }
 
 // nvs/SPIClass/Preferences 
@@ -502,6 +509,10 @@ bool ConnectWifi()
         return conn_result;
     }
     
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    WiFi.setTxPower(WIFI_POWER_5dBm);
+
     Led_On();
     WiFi.begin(WifiSSID.c_str(), WifiPassword.c_str());
 
@@ -547,6 +558,13 @@ bool ConnectWifi()
             delay(500);
             break;
         }
+
+        if (index > 40)
+        {
+            // 连接超时 
+            WiFi.disconnect();
+            break;
+        }
         Serial.println(status);
     }
     return conn_result;
@@ -569,6 +587,8 @@ void SyncSystemTime()
     tft.setTextColor(TFT_WHITE, TFT_BLACK, true);
     tft.drawString("正在同步时间...", 10, 60);
     tft.unloadFont();
+
+    int nTotalTimes = 0;
     do {
         Led_On();
         configTime(gmtOffset_sec, daylightOffset_sec, NTP_HOST);
@@ -583,6 +603,12 @@ void SyncSystemTime()
         Led_Off();
         delay(500);
         ltime = time(NULL);
+        
+        nTotalTimes++;
+        if (nTotalTimes>3)
+        {
+            break;
+        }        
     } while (ltime<24*60*60);
 }
 
@@ -682,7 +708,11 @@ void loop() {
             {
                 // wifi 可能出问题了 
                 int status = WiFi.status();
-                if (status == WL_NO_SSID_AVAIL || status == WL_CONNECTION_LOST)
+                if (
+                    status == WL_IDLE_STATUS || 
+                    status == WL_NO_SSID_AVAIL || 
+                    status == WL_CONNECTION_LOST
+                    )
                 {
                     // 重连wifi
                     bool bNewWifiConfig = false;
