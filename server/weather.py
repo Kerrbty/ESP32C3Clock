@@ -144,6 +144,9 @@ def get_weather_by_ip(ip):
                 dt = data['date'] + ' ' + jvweather['time'] + ':00'
                 timeArray = time.strptime(dt, "%Y-%m-%d %H:%M:%S")
                 data['updatetime'] =  int(time.mktime(timeArray)) # 更新时间 
+                # 00点交接会发生差一天的情况 
+                if data['updatetime'] > int(time.time()) :
+                    data['updatetime'] = data['updatetime'] - 24*60*60
             except:
                 pass
     return json.dumps(data)

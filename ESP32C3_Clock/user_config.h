@@ -16,8 +16,8 @@
 
 // 时区 
 #define TIME_ZONE        8
-#define LOCAL_HTTP_MIN   3     // 本地http间隔3分钟  
-#define NETWOEK_WEATHER_MIN    30   // 网络上天气间隔时间30分 
+#define LOCAL_HTTP_MIN   2     // 本地http间隔2分钟  
+#define NETWOEK_WEATHER_MIN    35   // 网络上天气间隔时间35分 
 
 // 屏幕区域 
 #define  TFT_WIDTH      240 
