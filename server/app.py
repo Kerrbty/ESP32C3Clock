@@ -18,7 +18,8 @@ def hello_world():
 @app.route('/getweather')
 def get_weathrer():
     if request.headers.has_key('X-Forwarded-For'):
-        return get_weather_by_ip(str(request.headers['X-Forwarded-For']))
+        json_data = get_weather_by_ip(str(request.headers['X-Forwarded-For']))
+        return Response(json_data, mimetype='application/json')
     return 'ip error'
 
 # 获取ip地址 
