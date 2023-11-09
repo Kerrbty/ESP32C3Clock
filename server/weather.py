@@ -132,7 +132,7 @@ def get_weather_by_ip(ip):
         if fi != -1 and li != -1:
             try:
                 jvweather = json.loads(current_weather[fi+1:li])
-                data['temp'] = jvweather['temp']  # 气温 
+                data['temp'] = str(int(float(jvweather['temp'])))  # 气温 
                 data['weather'] = jvweather['weather']  # 天气情况 
                 data['WD'] = jvweather['WD']  # 风向 
                 data['WS'] = jvweather['WS']  # 风力 
